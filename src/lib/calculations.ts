@@ -1,5 +1,11 @@
-import * as finnhub from 'finnhub';
+// Keep just these imports
 import { IndexData, IndicatorsData } from '@/src/types';
+
+const api_key = process.env.FINNHUB_API_KEY as string;
+const finnhubClient = new (require('finnhub')).DefaultApi({
+  apiKey: api_key,
+  isJsonMime: (input: string) => input === 'application/json'
+});
 
 interface FinnhubCandles {
   c: number[];  // close prices
