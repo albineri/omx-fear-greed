@@ -81,15 +81,24 @@ async function calculateVolatility(data: HistoricalRow[]): Promise<number> {
 
 export async function calculateFearGreedIndex(): Promise<IndexData> {
     try {
+      console.log("Starting API call, API key exists:", !!process.env.FINNHUB_API_KEY);
       const endDate = Math.floor(new Date().getTime() / 1000);
       const startDate = Math.floor(new Date().setMonth(new Date().getMonth() - 1) / 1000);
   
+      console.log("Fetching data for:", {
+        symbol: "OMXS30.ST",
+        startDate: new Date(startDate * 1000),
+        endDate: new Date(endDate * 1000)
+      });
+
       // Using OMXS30.ST for OMX Stockholm 30 Index
       const stockCandles = await new Promise<FinnhubCandles>((resolve, reject) => {
         finnhubClient.stockCandles("OMXS30.ST", "D", startDate, endDate, (error: Error | null, data: FinnhubCandles) => {
           if (error) {
+            console.error("Finnhub API error:", error);
             reject(error);
           } else {
+            console.log("Finnhub response:", data);
             resolve(data);
           }
         });
