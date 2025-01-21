@@ -3,7 +3,12 @@ import { IndexData, IndicatorsData } from '@/src/types';
 
 interface HistoricalRow {
   close: number;
-  date: string;
+  date: Date;
+  open: number;
+  high: number;
+  low: number;
+  volume: number;
+  adjClose?: number;
 }
 
 // Helper functions
