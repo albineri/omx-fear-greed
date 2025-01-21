@@ -56,14 +56,16 @@ export function FearGreedMeter() {
   };
 
 // ... keep all existing code, just update this part:
+// Update the useEffect part
 useEffect(() => {
     const fetchData = async () => {
       try {
+        setLoading(true);
         const response = await fetch('/api/index');
         if (!response.ok) throw new Error('Failed to fetch data');
         const json = await response.json();
         setData(json);
-      } catch (_error) {  // Changed from err to _error
+      } catch {  // This is now correct without _error
         setError('Could not load market data');
       } finally {
         setLoading(false);
@@ -74,6 +76,9 @@ useEffect(() => {
     const interval = setInterval(fetchData, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
+  
+  // For the duplicate props error, find any element that has duplicate style or className props
+  // and combine them into a single prop
 
   if (loading) return <div>Loading...</div>;
   if (error) return <div>{error}</div>;
@@ -122,7 +127,7 @@ useEffect(() => {
 
           <svg width={width} height={height} style={{ display: 'block', margin: '0 auto' }}>
             <defs>
-              <linearGradient id="gauge-gradient" x1="0%" y1="0%" x2="100%" y1="0%">
+              <linearGradient id="gauge-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" style={{ stopColor: '#c52828' }} />
                 <stop offset="25%" style={{ stopColor: '#e06c6c' }} />
                 <stop offset="50%" style={{ stopColor: '#f7c325' }} />
