@@ -55,19 +55,21 @@ export function FearGreedMeter() {
     return "Extrem Girighet";
   };
 
-  useEffect(() => {
+// ... keep all existing code, just update this part:
+useEffect(() => {
     const fetchData = async () => {
       try {
         const response = await fetch('/api/index');
+        if (!response.ok) throw new Error('Failed to fetch data');
         const json = await response.json();
         setData(json);
-      } catch (err) {
+      } catch (_error) {  // Changed from err to _error
         setError('Could not load market data');
       } finally {
         setLoading(false);
       }
     };
-
+  
     fetchData();
     const interval = setInterval(fetchData, 5 * 60 * 1000);
     return () => clearInterval(interval);
