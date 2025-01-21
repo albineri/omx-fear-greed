@@ -50,7 +50,7 @@ export async function calculateFearGreedIndex(): Promise<IndexData> {
     let totalValue = 0;
     let totalWeight = 0;
 
-    Object.entries(indicators).forEach(([_key, indicator]) => {
+    Object.values(indicators).forEach(indicator => {
       totalValue += indicator.value * indicator.weight;
       totalWeight += indicator.weight;
     });
