@@ -1,10 +1,16 @@
 declare module 'finnhub' {
-  export interface DefaultApiConfig {
+  export class DefaultApi {
     apiKey: string;
-    isJsonMime: (input: string) => boolean;
+    stockCandles(
+      symbol: string,
+      resolution: string,
+      from: number,
+      to: number,
+      callback: (error: Error | null, data: FinnhubResponse) => void
+    ): void;
   }
 
-  export interface FinnhubResponse {
+  interface FinnhubResponse {
     c: number[];  // close prices
     h: number[];  // high prices
     l: number[];  // low prices
@@ -14,14 +20,8 @@ declare module 'finnhub' {
     v: number[];  // volumes
   }
 
-  export class DefaultApi {
-    constructor(config: DefaultApiConfig);
-    stockCandles(
-      symbol: string,
-      resolution: string,
-      from: number,
-      to: number,
-      callback: (error: Error | null, data: FinnhubResponse) => void
-    ): void;
-  }
+  const finnhub: {
+    DefaultApi: typeof DefaultApi;
+  };
+  export default finnhub;
 }
