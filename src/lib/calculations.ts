@@ -1,11 +1,15 @@
-import finnhub from 'finnhub';
-
-const api_key = process.env.FINNHUB_API_KEY as string;
-const finnhubClient = new finnhub.DefaultApi({
-  apiKey: api_key,
-  isJsonMime: (input: string) => input === 'application/json'
-});
+import * as finnhub from 'finnhub';
 import { IndexData, IndicatorsData } from '@/src/types';
+
+interface FinnhubCandles {
+  c: number[];  // close prices
+  h: number[];  // high prices
+  l: number[];  // low prices
+  o: number[];  // open prices
+  s: string;    // status
+  t: number[];  // timestamps
+  v: number[];  // volumes
+}
 
 interface HistoricalRow {
   close: number;
@@ -14,7 +18,6 @@ interface HistoricalRow {
   high: number;
   low: number;
   volume: number;
-  adjClose?: number;
 }
 
 // Helper functions
@@ -77,8 +80,8 @@ export async function calculateFearGreedIndex(): Promise<IndexData> {
       const startDate = Math.floor(new Date().setMonth(new Date().getMonth() - 1) / 1000);
   
       // Using OMXS30.ST for OMX Stockholm 30 Index
-      const stockCandles = await new Promise((resolve, reject) => {
-        finnhubClient.stockCandles("OMXS30.ST", "D", startDate, endDate, (error: any, data: any) => {
+      const stockCandles = await new Promise<FinnhubCandles>((resolve, reject) => {
+        finnhubClient.stockCandles("OMXS30.ST", "D", startDate, endDate, (error: Error | null, data: FinnhubCandles) => {
           if (error) {
             reject(error);
           } else {
@@ -88,13 +91,13 @@ export async function calculateFearGreedIndex(): Promise<IndexData> {
       });
   
       // Convert Finnhub data to our HistoricalRow format
-      const omxData: HistoricalRow[] = (stockCandles as any).c.map((close: number, index: number) => ({
+      const omxData: HistoricalRow[] = stockCandles.c.map((close, index) => ({
         close,
-        date: new Date((stockCandles as any).t[index] * 1000),
-        open: (stockCandles as any).o[index],
-        high: (stockCandles as any).h[index],
-        low: (stockCandles as any).l[index],
-        volume: (stockCandles as any).v[index]
+        date: new Date(stockCandles.t[index] * 1000),
+        open: stockCandles.o[index],
+        high: stockCandles.h[index],
+        low: stockCandles.l[index],
+        volume: stockCandles.v[index]
       }));
   
       if (!omxData || omxData.length === 0) {
