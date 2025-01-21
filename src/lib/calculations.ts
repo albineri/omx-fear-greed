@@ -16,7 +16,6 @@ interface FinnhubCandles {
   t: number[];  // timestamps
   v: number[];  // volumes
 }
-
 interface HistoricalRow {
   close: number;
   date: Date;
