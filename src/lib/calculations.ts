@@ -1,5 +1,5 @@
 import yahooFinance from 'yahoo-finance2';
-import { IndexData, IndicatorsData } from '@/types';
+import { IndexData, IndicatorsData } from '@/src/types';
 
 interface HistoricalRow {
   close: number;
