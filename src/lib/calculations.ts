@@ -1,4 +1,10 @@
-import yahooFinance from 'yahoo-finance2';
+import finnhub from 'finnhub';
+
+const api_key = process.env.FINNHUB_API_KEY as string;
+const finnhubClient = new finnhub.DefaultApi({
+  apiKey: api_key,
+  isJsonMime: (input: string) => input === 'application/json'
+});
 import { IndexData, IndicatorsData } from '@/src/types';
 
 interface HistoricalRow {
@@ -66,52 +72,67 @@ async function calculateVolatility(data: HistoricalRow[]): Promise<number> {
 }
 
 export async function calculateFearGreedIndex(): Promise<IndexData> {
-  try {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - 1);
-
-    const omxData = await yahooFinance.historical('^OMX', {
-      period1: startDate.toISOString(),
-      period2: endDate.toISOString()
-    }) as HistoricalRow[];
-
-    if (!omxData || omxData.length === 0) {
-      throw new Error('No market data available');
-    }
-
-    const momentum = await calculateMarketMomentum(omxData);
-    const volatility = await calculateVolatility(omxData);
-
-    const indicators: IndicatorsData = {
-      'Market Momentum': { value: momentum, weight: 0.5 },
-      'Market Volatility': { value: volatility, weight: 0.5 }
-    };
-
-    let totalValue = 0;
-    let totalWeight = 0;
-
-    Object.values(indicators).forEach(indicator => {
-      totalValue += indicator.value * indicator.weight;
-      totalWeight += indicator.weight;
-    });
-
-    const currentIndex = Math.round(totalValue / totalWeight);
-
-    return {
-      timestamp: new Date().toISOString(),
-      currentIndex: Math.min(Math.max(currentIndex, 0), 100),
-      indicators
-    };
-  } catch (_error) {
-    console.error('Error calculating fear & greed index:', _error);
-    return {
-      timestamp: new Date().toISOString(),
-      currentIndex: 50,
-      indicators: {
-        'Market Momentum': { value: 50, weight: 0.5 },
-        'Market Volatility': { value: 50, weight: 0.5 }
+    try {
+      const endDate = Math.floor(new Date().getTime() / 1000);
+      const startDate = Math.floor(new Date().setMonth(new Date().getMonth() - 1) / 1000);
+  
+      // Using OMXS30.ST for OMX Stockholm 30 Index
+      const stockCandles = await new Promise((resolve, reject) => {
+        finnhubClient.stockCandles("OMXS30.ST", "D", startDate, endDate, (error: any, data: any) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(data);
+          }
+        });
+      });
+  
+      // Convert Finnhub data to our HistoricalRow format
+      const omxData: HistoricalRow[] = (stockCandles as any).c.map((close: number, index: number) => ({
+        close,
+        date: new Date((stockCandles as any).t[index] * 1000),
+        open: (stockCandles as any).o[index],
+        high: (stockCandles as any).h[index],
+        low: (stockCandles as any).l[index],
+        volume: (stockCandles as any).v[index]
+      }));
+  
+      if (!omxData || omxData.length === 0) {
+        throw new Error('No market data available');
       }
-    };
+  
+      const momentum = await calculateMarketMomentum(omxData);
+      const volatility = await calculateVolatility(omxData);
+  
+      const indicators: IndicatorsData = {
+        'Market Momentum': { value: momentum, weight: 0.5 },
+        'Market Volatility': { value: volatility, weight: 0.5 }
+      };
+  
+      let totalValue = 0;
+      let totalWeight = 0;
+  
+      Object.values(indicators).forEach(indicator => {
+        totalValue += indicator.value * indicator.weight;
+        totalWeight += indicator.weight;
+      });
+  
+      const currentIndex = Math.round(totalValue / totalWeight);
+  
+      return {
+        timestamp: new Date().toISOString(),
+        currentIndex: Math.min(Math.max(currentIndex, 0), 100),
+        indicators
+      };
+    } catch (_error) {
+      console.error('Error calculating fear & greed index:', _error);
+      return {
+        timestamp: new Date().toISOString(),
+        currentIndex: 50,
+        indicators: {
+          'Market Momentum': { value: 50, weight: 0.5 },
+          'Market Volatility': { value: 50, weight: 0.5 }
+        }
+      };
+    }
   }
-}
