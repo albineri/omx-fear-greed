@@ -1,13 +1,6 @@
 import { IndexData, IndicatorsData } from '@/src/types';
 import * as finnhub from 'finnhub';
 
-const api_key = process.env.FINNHUB_API_KEY as string;
-
-const finnhubClient = new finnhub.DefaultApi({
-  apiKey: api_key,
-  isJsonMime: (input: string) => input === 'application/json'
-});
-
 interface FinnhubCandles {
   c: number[];  // close prices
   h: number[];  // high prices
@@ -17,6 +10,15 @@ interface FinnhubCandles {
   t: number[];  // timestamps
   v: number[];  // volumes
 }
+
+const api_key = process.env.FINNHUB_API_KEY as string;
+if (!api_key) {
+    console.error('FINNHUB_API_KEY environment variable is not set');
+    throw new Error('Missing API key');
+  }
+const finnhubClient = new finnhub.DefaultApi();
+finnhubClient.apiKey = api_key;
+
 interface HistoricalRow {
   close: number;
   date: Date;
