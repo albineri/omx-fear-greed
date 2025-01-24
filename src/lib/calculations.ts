@@ -1,23 +1,17 @@
 import { IndexData, IndicatorsData } from '@/src/types';
-import * as finnhub from 'finnhub';
+import axios from 'axios';
 
-interface FinnhubCandles {
-  c: number[];  // close prices
-  h: number[];  // high prices
-  l: number[];  // low prices
-  o: number[];  // open prices
-  s: string;    // status
-  t: number[];  // timestamps
-  v: number[];  // volumes
-}
-
-const api_key = process.env.FINNHUB_API_KEY as string;
-if (!api_key) {
-    console.error('FINNHUB_API_KEY environment variable is not set');
-    throw new Error('Missing API key');
+interface AlphaVantageData {
+  'Time Series (Daily)': {
+    [key: string]: {
+      '1. open': string;
+      '2. high': string;
+      '3. close': string;
+      '4. low': string;
+      '5. volume': string;
+    }
   }
-const finnhubClient = new finnhub.DefaultApi();
-finnhubClient.apiKey = api_key;
+}
 
 interface HistoricalRow {
   close: number;
@@ -28,7 +22,13 @@ interface HistoricalRow {
   volume: number;
 }
 
-// Helper functions
+const api_key = process.env.ALPHA_VANTAGE_API_KEY as string;
+if (!api_key) {
+  console.error('ALPHA_VANTAGE_API_KEY environment variable is not set');
+  throw new Error('Missing API key');
+}
+
+// Helper functions remain the same
 function calculateMovingAverage(data: number[], window: number): number[] {
   const result = [];
   for (let i = 0; i < data.length; i++) {
@@ -49,7 +49,7 @@ function calculateStandardDeviation(data: number[]): number {
   return Math.sqrt(variance);
 }
 
-// Market indicators
+// Market indicators remain the same
 async function calculateMarketMomentum(data: HistoricalRow[]): Promise<number> {
   try {
     const prices = data.map(d => d.close);
@@ -83,76 +83,61 @@ async function calculateVolatility(data: HistoricalRow[]): Promise<number> {
 }
 
 export async function calculateFearGreedIndex(): Promise<IndexData> {
-    try {
-      console.log("Starting API call, API key exists:", !!process.env.FINNHUB_API_KEY);
-      const endDate = Math.floor(new Date().getTime() / 1000);
-      const startDate = Math.floor(new Date().setMonth(new Date().getMonth() - 1) / 1000);
-  
-      console.log("Fetching data for:", {
-        symbol: "OMXS30.ST",
-        startDate: new Date(startDate * 1000),
-        endDate: new Date(endDate * 1000)
-      });
+  try {
+    console.log("Starting API call, API key exists:", !!process.env.ALPHA_VANTAGE_API_KEY);
 
-      // Using OMXS30.ST for OMX Stockholm 30 Index
-      const stockCandles = await new Promise<FinnhubCandles>((resolve, reject) => {
-        finnhubClient.stockCandles("OMXS30.ST", "D", startDate, endDate, (error: Error | null, data: FinnhubCandles) => {
-          if (error) {
-            console.error("Finnhub API error:", error);
-            reject(error);
-          } else {
-            console.log("Finnhub response:", data);
-            resolve(data);
-          }
-        });
-      });
-  
-      // Convert Finnhub data to our HistoricalRow format
-      const omxData: HistoricalRow[] = stockCandles.c.map((close, index) => ({
-        close,
-        date: new Date(stockCandles.t[index] * 1000),
-        open: stockCandles.o[index],
-        high: stockCandles.h[index],
-        low: stockCandles.l[index],
-        volume: stockCandles.v[index]
-      }));
-  
-      if (!omxData || omxData.length === 0) {
-        throw new Error('No market data available');
-      }
-  
-      const momentum = await calculateMarketMomentum(omxData);
-      const volatility = await calculateVolatility(omxData);
-  
-      const indicators: IndicatorsData = {
-        'Market Momentum': { value: momentum, weight: 0.5 },
-        'Market Volatility': { value: volatility, weight: 0.5 }
-      };
-  
-      let totalValue = 0;
-      let totalWeight = 0;
-  
-      Object.values(indicators).forEach(indicator => {
-        totalValue += indicator.value * indicator.weight;
-        totalWeight += indicator.weight;
-      });
-  
-      const currentIndex = Math.round(totalValue / totalWeight);
-  
-      return {
-        timestamp: new Date().toISOString(),
-        currentIndex: Math.min(Math.max(currentIndex, 0), 100),
-        indicators
-      };
-    } catch (_error) {
-      console.error('Error calculating fear & greed index:', _error);
-      return {
-        timestamp: new Date().toISOString(),
-        currentIndex: 50,
-        indicators: {
-          'Market Momentum': { value: 50, weight: 0.5 },
-          'Market Volatility': { value: 50, weight: 0.5 }
-        }
-      };
+    const response = await axios.get<AlphaVantageData>(
+      `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=^OMX&apikey=${api_key}`
+    );
+
+    if (!response.data['Time Series (Daily)']) {
+      throw new Error('No market data available');
     }
+
+    // Convert Alpha Vantage data to our format
+    const omxData: HistoricalRow[] = Object.entries(response.data['Time Series (Daily)'])
+      .map(([date, data]) => ({
+        date: new Date(date),
+        open: parseFloat(data['1. open']),
+        high: parseFloat(data['2. high']),
+        low: parseFloat(data['3. low']),
+        close: parseFloat(data['4. close']),
+        volume: parseFloat(data['5. volume'])
+      }))
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    const momentum = await calculateMarketMomentum(omxData);
+    const volatility = await calculateVolatility(omxData);
+
+    const indicators: IndicatorsData = {
+      'Market Momentum': { value: momentum, weight: 0.5 },
+      'Market Volatility': { value: volatility, weight: 0.5 }
+    };
+
+    let totalValue = 0;
+    let totalWeight = 0;
+
+    Object.values(indicators).forEach(indicator => {
+      totalValue += indicator.value * indicator.weight;
+      totalWeight += indicator.weight;
+    });
+
+    const currentIndex = Math.round(totalValue / totalWeight);
+
+    return {
+      timestamp: new Date().toISOString(),
+      currentIndex: Math.min(Math.max(currentIndex, 0), 100),
+      indicators
+    };
+  } catch (_error) {
+    console.error('Error calculating fear & greed index:', _error);
+    return {
+      timestamp: new Date().toISOString(),
+      currentIndex: 50,
+      indicators: {
+        'Market Momentum': { value: 50, weight: 0.5 },
+        'Market Volatility': { value: 50, weight: 0.5 }
+      }
+    };
   }
+}
